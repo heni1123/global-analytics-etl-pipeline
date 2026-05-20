@@ -1,28 +1,41 @@
 import aiohttp
 import asyncio
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, List
+from db_connection import get_connection_pool
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class ExchangeRatesExtractor:
-    def __init__(self, url: str):
-        self.url = url
-        self.logger = logging.getLogger(__name__)
+    API_URL = "https://open.er-api.com/v6/latest/USD"
 
-    async def fetch_exchange_rates(self) -> Dict[str, Any]:
+    async def fetch_exchange_rates(self) -> List[Dict[str, Any]]:
         async with aiohttp.ClientSession() as session:
             try:
-                async with session.get(self.url) as response:
+                async with session.get(self.API_URL) as response:
                     response.raise_for_status()
                     data = await response.json()
-                    self.logger.info("Successfully fetched exchange rates data.")
-                    return data
+                    return self.transform_data(data)
             except aiohttp.ClientError as e:
-                self.logger.error(f"Error fetching exchange rates: {e}")
-                raise
+                logger.error(f"Error fetching exchange rates: {e}")
+                return []
 
-    async def extract(self) -> Dict[str, Any]:
-        return await self.fetch_exchange_rates()
+    def transform_data(self, Dict[str, Any]) -> List[Dict[str, Any]]:
+        rates = data.get("rates", {})
+        transformed_data = []
+        for currency, rate in rates.items():
+            transformed_data.append({
+                "currency_code": currency,
+                "exchange_rate": rate,
+                "base_currency": "USD"
+            })
+        return transformed_data
 
-# Example usage:
-# extractor = ExchangeRatesExtractor("https://open.er-api.com/v6/latest/USD")
-# exchange_rates = asyncio.run(extractor.extract())
+async def main():
+    extractor = ExchangeRatesExtractor()
+    exchange_rates = await extractor.fetch_exchange_rates()
+    logger.info(f"Extracted exchange rates: {exchange_rates}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
