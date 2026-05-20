@@ -1,0 +1,73 @@
+{
+  "sources": [
+    {
+      "name": "source_crypto_prices",
+      "url": "https://api.coingecko.com/api/v3/coins/markets",
+      "auth": "none"
+    },
+    {
+      "name": "source_countries_data",
+      "url": "https://restcountries.com/v3.1/all",
+      "auth": "none"
+    },
+    {
+      "name": "source_universities",
+      "url": "http://universities.hipolabs.com/search",
+      "auth": "none"
+    },
+    {
+      "name": "source_exchange_rates",
+      "url": "https://open.er-api.com/v6/latest/USD",
+      "auth": "none"
+    }
+  ],
+  "targets": [
+    {
+      "table": "fact_crypto_markets",
+      "schema": "public",
+      "load_strategy": "upsert"
+    },
+    {
+      "table": "dim_countries",
+      "schema": "public",
+      "load_strategy": "merge"
+    },
+    {
+      "table": "dim_universities",
+      "schema": "public",
+      "load_strategy": "upsert"
+    },
+    {
+      "table": "fact_regional_crypto_stats",
+      "schema": "public",
+      "load_strategy": "truncate_insert"
+    }
+  ],
+  "pipeline_settings": {
+    "env_vars": {
+      "GITHUB_TOKEN": "${GITHUB_TOKEN}",
+      "DB_PASSWORD": "${DB_PASSWORD}",
+      "API_KEY": "${API_KEY}"
+    },
+    "git": {
+      "repo": "heni1123/global-analytics-etl-pipeline",
+      "branch": "main"
+    }
+  },
+  "retry_policies": {
+    "max_retries": 3,
+    "retry_interval": 5
+  },
+  "monitoring": {
+    "enabled": true,
+    "tool": "Prometheus",
+    "alerts": {
+      "error_threshold": 5,
+      "success_threshold": 95
+    }
+  },
+  "schedule": {
+    "frequency": "daily",
+    "time": "02:00"
+  }
+}
