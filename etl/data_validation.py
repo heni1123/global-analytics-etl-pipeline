@@ -1,76 +1,89 @@
 import logging
 from typing import List, Dict, Any
-from db_connection import get_connection
+import asyncpg
+from db_connection import get_connection_pool
 
 class DataValidation:
     def __init__(self):
-        self.logger = logging.getLogger(__name__)
+        self.pool = get_connection_pool()
+        logging.basicConfig(level=logging.INFO)
 
-    async def validate_crypto_data(self, List[Dict[str, Any]]) -> bool:
-        if not data:
-            self.logger.error("No cryptocurrency data to validate.")
-            return False
-        
-        for record in data:
-            if 'id' not in record or 'current_price' not in record or 'market_cap' not in record:
-                self.logger.error(f"Invalid cryptocurrency record: {record}")
-                return False
-            if not isinstance(record['id'], str) or not isinstance(record['current_price'], (int, float)) or not isinstance(record['market_cap'], (int, float)):
-                self.logger.error(f"Invalid data types in cryptocurrency record: {record}")
-                return False
-        
-        self.logger.info("Cryptocurrency data validation passed.")
-        return True
+    async def validate_crypto_data(self) -> None:
+        async with self.pool.acquire() as connection:
+            try:
+                query = """
+                SELECT COUNT(*) FROM public.fact_crypto_markets
+                WHERE crypto_id IS NULL OR snapshot_date IS NULL
+                """
+                result = await connection.fetchval(query)
+                if result > 0:
+                    logging.error("Validation failed: Found %s rows with NULL primary keys in fact_crypto_markets", result)
+                else:
+                    logging.info("Validation passed for fact_crypto_markets")
 
-    async def validate_countries_data(self, List[Dict[str, Any]]) -> bool:
-        if not data:
-            self.logger.error("No countries data to validate.")
-            return False
-        
-        for record in data:
-            if 'cca2' not in record or 'name' not in record or 'population' not in record:
-                self.logger.error(f"Invalid country record: {record}")
-                return False
-            if not isinstance(record['cca2'], str) or not isinstance(record['name'], dict) or not isinstance(record['population'], int):
-                self.logger.error(f"Invalid data types in country record: {record}")
-                return False
-        
-        self.logger.info("Countries data validation passed.")
-        return True
+                query = """
+                SELECT COUNT(*) FROM public.fact_crypto_markets
+                WHERE market_cap_category IS NULL OR volatility_flag IS NULL
+                """
+                result = await connection.fetchval(query)
+                if result > 0:
+                    logging.error("Validation failed: Found %s rows with NULL values in fact_crypto_markets", result)
+                else:
+                    logging.info("Validation passed for fact_crypto_markets data integrity")
 
-    async def validate_universities_data(self, List[Dict[str, Any]]) -> bool:
-        if not data:
-            self.logger.error("No universities data to validate.")
-            return False
-        
-        for record in data:
-            if 'id' not in record or 'name' not in record or 'country' not in record:
-                self.logger.error(f"Invalid university record: {record}")
-                return False
-            if not isinstance(record['id'], str) or not isinstance(record['name'], str) or not isinstance(record['country'], str):
-                self.logger.error(f"Invalid data types in university record: {record}")
-                return False
-        
-        self.logger.info("Universities data validation passed.")
-        return True
+            except Exception as e:
+                logging.error("Error during crypto data validation: %s", e)
 
-    async def validate_exchange_rates_data(self, Dict[str, Any]) -> bool:
-        if not data or 'rates' not in data:
-            self.logger.error("No exchange rates data to validate.")
-            return False
-        
-        for currency, rate in data['rates'].items():
-            if not isinstance(currency, str) or not isinstance(rate, (int, float)):
-                self.logger.error(f"Invalid exchange rate record: {currency}: {rate}")
-                return False
-        
-        self.logger.info("Exchange rates data validation passed.")
-        return True
+    async def validate_countries_data(self) -> None:
+        async with self.pool.acquire() as connection:
+            try:
+                query = """
+                SELECT COUNT(*) FROM public.dim_countries
+                WHERE country_code IS NULL
+                """
+                result = await connection.fetchval(query)
+                if result > 0:
+                    logging.error("Validation failed: Found %s rows with NULL primary keys in dim_countries", result)
+                else:
+                    logging.info("Validation passed for dim_countries")
 
-    async def validate_all_data(self, crypto_List[Dict[str, Any]], countries_List[Dict[str, Any]], universities_List[Dict[str, Any]], exchange_rates_Dict[str, Any]) -> bool:
-        crypto_valid = await self.validate_crypto_data(crypto_data)
-        countries_valid = await self.validate_countries_data(countries_data)
-        universities_valid = await self.validate_universities_data(universities_data)
-        exchange_rates_valid = await self.validate_exchange_rates_data(exchange_rates_data)
+            except Exception as e:
+                logging.error("Error during countries data validation: %s", e)
 
-        return crypto_valid and countries_valid and universities_valid and exchange_rates_valid
+    async def validate_universities_data(self) -> None:
+        async with self.pool.acquire() as connection:
+            try:
+                query = """
+                SELECT COUNT(*) FROM public.dim_universities
+                WHERE university_id IS NULL
+                """
+                result = await connection.fetchval(query)
+                if result > 0:
+                    logging.error("Validation failed: Found %s rows with NULL primary keys in dim_universities", result)
+                else:
+                    logging.info("Validation passed for dim_universities")
+
+            except Exception as e:
+                logging.error("Error during universities data validation: %s", e)
+
+    async def validate_exchange_rates_data(self) -> None:
+        async with self.pool.acquire() as connection:
+            try:
+                query = """
+                SELECT COUNT(*) FROM public.dim_exchange_rates
+                WHERE currency IS NULL OR rate IS NULL
+                """
+                result = await connection.fetchval(query)
+                if result > 0:
+                    logging.error("Validation failed: Found %s rows with NULL values in dim_exchange_rates", result)
+                else:
+                    logging.info("Validation passed for dim_exchange_rates data integrity")
+
+            except Exception as e:
+                logging.error("Error during exchange rates data validation: %s", e)
+
+    async def run_validations(self) -> None:
+        await self.validate_crypto_data()
+        await self.validate_countries_data()
+        await self.validate_universities_data()
+        await self.validate_exchange_rates_data()
