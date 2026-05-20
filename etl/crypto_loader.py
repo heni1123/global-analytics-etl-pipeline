@@ -10,7 +10,7 @@ class CryptoLoader:
     def __init__(self):
         self.pool = get_connection_pool()
 
-    async def load_data(self, crypto_List[Dict[str, Any]], snapshot_date: str) -> None:
+    async def load_crypto_data(self, crypto_List[Dict[str, Any]], snapshot_date: str) -> None:
         async with self.pool.acquire() as connection:
             async with connection.transaction():
                 for crypto in crypto_data:
@@ -23,14 +23,14 @@ class CryptoLoader:
             high_24h, low_24h, price_change_24h, snapshot_date)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             ON CONFLICT (crypto_id, snapshot_date) DO UPDATE SET
-            name = EXCLUDED.name,
-            symbol = EXCLUDED.symbol,
-            current_price = EXCLUDED.current_price,
-            market_cap = EXCLUDED.market_cap,
-            total_volume = EXCLUDED.total_volume,
-            high_24h = EXCLUDED.high_24h,
-            low_24h = EXCLUDED.low_24h,
-            price_change_24h = EXCLUDED.price_change_24h;
+                name = EXCLUDED.name,
+                symbol = EXCLUDED.symbol,
+                current_price = EXCLUDED.current_price,
+                market_cap = EXCLUDED.market_cap,
+                total_volume = EXCLUDED.total_volume,
+                high_24h = EXCLUDED.high_24h,
+                low_24h = EXCLUDED.low_24h,
+                price_change_24h = EXCLUDED.price_change_24h;
             """
             await connection.execute(query, 
                 crypto['id'], 
@@ -46,4 +46,14 @@ class CryptoLoader:
             )
             logger.info(f"Upserted data for crypto_id: {crypto['id']} on {snapshot_date}")
         except Exception as e:
-            logger.error(f"Error upserting data for crypto_id: {crypto['id']} - {str(e)}")
+            logger.error(f"Error upserting crypto data for {crypto['id']}: {e}")
+
+async def main():
+    loader = CryptoLoader()
+    # Assuming crypto_data is fetched from the extractor
+    crypto_data = []  # This should be replaced with actual data from the extractor
+    snapshot_date = "2023-10-01"  # Example snapshot date
+    await loader.load_crypto_data(crypto_data, snapshot_date)
+
+if __name__ == "__main__":
+    asyncio.run(main())
