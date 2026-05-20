@@ -2,27 +2,22 @@ import aiohttp
 import asyncio
 import logging
 from typing import List, Dict, Any
+from db_connection import get_connection_pool
 
 class CryptoExtractor:
-    API_URL = "https://api.coingecko.com/api/v3/coins/markets"
-    
-    def __init__(self) -> None:
-        self.logger = self.setup_logging()
-
-    def setup_logging(self) -> logging.Logger:
-        logging.basicConfig(level=logging.INFO)
-        logger = logging.getLogger(__name__)
-        return logger
+    def __init__(self):
+        self.api_url = "https://api.coingecko.com/api/v3/coins/markets"
+        self.logger = logging.getLogger(__name__)
 
     async def fetch_data(self) -> List[Dict[str, Any]]:
         async with aiohttp.ClientSession() as session:
             try:
-                async with session.get(self.API_URL) as response:
+                async with session.get(self.api_url) as response:
                     response.raise_for_status()
                     data = await response.json()
                     return self.extract_relevant_fields(data)
             except aiohttp.ClientError as e:
-                self.logger.error(f"HTTP error occurred: {e}")
+                self.logger.error(f"API request failed: {e}")
                 return []
             except Exception as e:
                 self.logger.error(f"An error occurred: {e}")
@@ -41,11 +36,14 @@ class CryptoExtractor:
             })
         return extracted_data
 
-    async def run(self) -> List[Dict[str, Any]]:
-        return await self.fetch_data()
+    async def run(self) -> None:
+        data = await self.fetch_data()
+        if data:
+            self.logger.info(f"Extracted {len(data)} cryptocurrency records.")
+        else:
+            self.logger.warning("No data extracted.")
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     extractor = CryptoExtractor()
-    loop = asyncio.get_event_loop()
-    crypto_data = loop.run_until_complete(extractor.run())
-    print(crypto_data)
+    asyncio.run(extractor.run())
