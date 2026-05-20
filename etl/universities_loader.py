@@ -28,22 +28,31 @@ class UniversitiesLoader:
                 web_pages = EXCLUDED.web_pages,
                 domains = EXCLUDED.domains,
                 state_province = EXCLUDED.state_province,
-                "type" = EXCLUDED."type",
-                "year_founded" = EXCLUDED."year_founded",
-                "student_count" = EXCLUDED."student_count";
+                "type" = EXCLUDED.type,
+                "year_founded" = EXCLUDED.year_founded,
+                "student_count" = EXCLUDED.student_count;
             """
             await connection.execute(query, 
-                university['id'], 
-                university['name'], 
-                university['country'], 
-                university['alpha_two_code'], 
-                university['web_pages'], 
-                university['domains'], 
-                university.get('state-province', None), 
-                university.get('type', None), 
-                university.get('year_founded', None), 
-                university.get('student_count', None)
+                university.get('id'), 
+                university.get('name'), 
+                university.get('country'), 
+                university.get('alpha_two_code'), 
+                university.get('web_pages', []), 
+                university.get('domains', []), 
+                university.get('state-province'), 
+                university.get('type', []), 
+                university.get('year_founded'), 
+                university.get('student_count', 0)
             )
-            logger.info(f"Upserted university: {university['name']}")
+            logger.info(f"Upserted university: {university.get('name')}")
         except Exception as e:
-            logger.error(f"Error upserting university {university['name']}: {e}")
+            logger.error(f"Error upserting university {university.get('name')}: {e}")
+
+async def main():
+    loader = UniversitiesLoader()
+    # Assuming universities_data is fetched from the universities_extractor
+    universities_data = []  # This should be replaced with actual data fetching logic
+    await loader.load_universities(universities_data)
+
+if __name__ == "__main__":
+    asyncio.run(main())
