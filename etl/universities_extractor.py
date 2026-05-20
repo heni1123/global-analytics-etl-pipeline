@@ -4,41 +4,36 @@ import logging
 from typing import List, Dict, Any
 from db_connection import get_connection_pool
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 class UniversitiesExtractor:
-    def __init__(self):
-        self.api_url = "http://universities.hipolabs.com/search"
-        self.logger = logging.getLogger(__name__)
+    API_URL = "http://universities.hipolabs.com/search"
 
     async def fetch_universities(self) -> List[Dict[str, Any]]:
         async with aiohttp.ClientSession() as session:
             try:
-                async with session.get(self.api_url) as response:
+                async with session.get(self.API_URL) as response:
                     response.raise_for_status()
                     data = await response.json()
-                    return self.extract_relevant_fields(data)
+                    return self.extract_fields(data)
             except aiohttp.ClientError as e:
-                self.logger.error(f"Error fetching universities {e}")
+                logger.error(f"Error fetching universities {e}")
                 return []
 
-    def extract_relevant_fields(self, List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        universities = []
+    def extract_fields(self, List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        extracted_data = []
         for item in data:
-            university = {
+            university_info = {
                 "name": item.get("name"),
                 "country": item.get("country"),
                 "alpha_two_code": item.get("alpha_two_code"),
+                "state_province": item.get("state-province")
             }
-            universities.append(university)
-        return universities
+            extracted_data.append(university_info)
+        return extracted_data
 
     async def run(self) -> None:
-        universities_data = await self.fetch_universities()
-        if universities_data:
-            self.logger.info(f"Fetched {len(universities_data)} universities.")
-        else:
-            self.logger.warning("No universities data fetched.")
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    extractor = UniversitiesExtractor()
-    asyncio.run(extractor.run())
+        universities = await self.fetch_universities()
+        logger.info(f"Extracted {len(universities)} universities data.")
+        # Further processing can be done here, such as loading to the database.
