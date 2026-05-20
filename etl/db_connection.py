@@ -1,52 +1,45 @@
-import psycopg2
-from psycopg2 import pool
+import asyncpg
 import logging
+from typing import Any, Dict
 
-class DatabaseConnectionPool:
-    def __init__(self, dbname: str, user: str, password: str, host: str, port: str, minconn: int = 1, maxconn: int = 10):
-        self.connection_pool = None
-        self._initialize_pool(dbname, user, password, host, port, minconn, maxconn)
+class DatabaseConnection:
+    def __init__(self, database_url: str):
+        self.database_url = database_url
+        self.pool = None
+        self.logger = logging.getLogger(__name__)
 
-    def _initialize_pool(self, dbname: str, user: str, password: str, host: str, port: str, minconn: int, maxconn: int):
+    async def connect(self) -> None:
         try:
-            self.connection_pool = psycopg2.pool.SimpleConnectionPool(
-                minconn,
-                maxconn,
-                dbname=dbname,
-                user=user,
-                password=password,
-                host=host,
-                port=port
-            )
-            logging.info("PostgreSQL connection pool created successfully")
+            self.pool = await asyncpg.create_pool(self.database_url)
+            self.logger.info("Database connection pool created successfully.")
         except Exception as e:
-            logging.error(f"Error creating connection pool: {e}")
+            self.logger.error(f"Error creating database connection pool: {e}")
             raise
 
-    def get_connection(self):
-        try:
-            connection = self.connection_pool.getconn()
-            logging.info("Connection retrieved from pool")
-            return connection
-        except Exception as e:
-            logging.error(f"Error getting connection from pool: {e}")
-            raise
+    async def close(self) -> None:
+        if self.pool:
+            await self.pool.close()
+            self.logger.info("Database connection pool closed.")
 
-    def release_connection(self, connection):
-        try:
-            self.connection_pool.putconn(connection)
-            logging.info("Connection returned to pool")
-        except Exception as e:
-            logging.error(f"Error returning connection to pool: {e}")
-            raise
+    async def execute(self, query: str, *args: Any) -> None:
+        async with self.pool.acquire() as connection:
+            async with connection.transaction():
+                try:
+                    await connection.execute(query, *args)
+                    self.logger.info("Query executed successfully.")
+                except Exception as e:
+                    self.logger.error(f"Error executing query: {e}")
+                    raise
 
-    def close_all_connections(self):
-        try:
-            self.connection_pool.closeall()
-            logging.info("All connections in the pool have been closed")
-        except Exception as e:
-            logging.error(f"Error closing all connections: {e}")
-            raise
+    async def fetch(self, query: str, *args: Any) -> Any:
+        async with self.pool.acquire() as connection:
+            try:
+                result = await connection.fetch(query, *args)
+                self.logger.info("Query fetched successfully.")
+                return result
+            except Exception as e:
+                self.logger.error(f"Error fetching {e}")
+                raise
 
-# Example usage:
-# db_pool = DatabaseConnectionPool(dbname='global_analytics_dw', user='your_user', password='your_password', host='localhost', port='5432')
+database_url = "postgresql://user:password@localhost:5432/global_analytics_dw"
+db_connection = DatabaseConnection(database_url)
